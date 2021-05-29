@@ -100,7 +100,7 @@ int main(int argc, char **argv)
       number   : /-?[0-9]+/ ;                             \
       operator : '+' | '-' | '*' | '/' ;                  \
       expr     : <number> | '(' <operator> <expr>+ ')' ;  \
-      lispy    : /^/ <operator> <expr>+ /$/ ;             \
+      lispy    : /^/ <operator> <expr>+ /$/ | <number>;             \
     ",
               Number, Operator, Expr, Lispy);
 
@@ -117,6 +117,7 @@ int main(int argc, char **argv)
         if (mpc_parse("<stdin>", input, Lispy, &r))
         {
 
+            mpc_ast_print(r.output);
             lval result = eval(r.output);
             lval_println(result);
             mpc_ast_delete(r.output);
