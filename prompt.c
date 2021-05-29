@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "mpc/mpc.h"
+#include "lval.h"
 
 #ifdef _WIN32
 
@@ -25,43 +26,57 @@ void add_history(char *unused) {}
 #endif
 
 /* Use operator string to see which operation to perform */
-long eval_op(long x, char *op, long y)
+lval eval_op(lval x, char *op, lval y)
 {
+
+    /* If either value is an error return it */
+    if (x.type == LVAL_ERR)
+    {
+        return x;
+    }
+    if (y.type == LVAL_ERR)
+    {
+        return y;
+    }
+
+    /* Otherwise do maths on the number values */
     if (strcmp(op, "+") == 0)
     {
-        return x + y;
+        return lval_num(x.num + y.num);
     }
     if (strcmp(op, "-") == 0)
     {
-        return x - y;
+        return lval_num(x.num - y.num);
     }
     if (strcmp(op, "*") == 0)
     {
-        return x * y;
+        return lval_num(x.num * y.num);
     }
     if (strcmp(op, "/") == 0)
     {
-        return x / y;
+        /* If second operand is zero return error */
+        return y.num == 0
+                   ? lval_err(LERR_DIV_ZERO)
+                   : lval_num(x.num / y.num);
     }
-    return 0;
+
+    return lval_err(LERR_BAD_OP);
 }
 
-long eval(mpc_ast_t *t)
+lval eval(mpc_ast_t *t)
 {
 
-    /* If tagged as number return it directly. */
     if (strstr(t->tag, "number"))
     {
-        return atoi(t->contents);
+        /* Check if there is some error in conversion */
+        errno = 0;
+        long x = strtol(t->contents, NULL, 10);
+        return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
     }
 
-    /* The operator is always second child. */
     char *op = t->children[1]->contents;
+    lval x = eval(t->children[2]);
 
-    /* We store the third child in `x` */
-    long x = eval(t->children[2]);
-
-    /* Iterate the remaining children and combining. */
     int i = 3;
     while (strstr(t->children[i]->tag, "expr"))
     {
@@ -102,8 +117,8 @@ int main(int argc, char **argv)
         if (mpc_parse("<stdin>", input, Lispy, &r))
         {
 
-            long result = eval(r.output);
-            printf("%li\n", result);
+            lval result = eval(r.output);
+            lval_println(result);
             mpc_ast_delete(r.output);
         }
         else
